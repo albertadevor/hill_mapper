@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Is it uphill?</title>
+    <meta name="viewport" content="initial-scale=1.0">
+    <meta charset="utf-8">
+    <style>
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+      #map {
+        width: 700px;
+        height: 500px;
+      }
+       .controls {
+        margin-top: 10px;
+        border: 1px solid transparent;
+        border-radius: 2px 0 0 2px;
+        box-sizing: border-box;
+        -moz-box-sizing: border-box;
+        height: 32px;
+        outline: none;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+      }
+
+      #pac-input {
+        background-color: #fff;
+        font-family: Roboto;
+        font-size: 15px;
+        font-weight: 300;
+        margin-left: 12px;
+        padding: 0 11px 0 13px;
+        text-overflow: ellipsis;
+        width: 200px;
+      }
+
+      #pac-input2 {
+        background-color: #fff;
+        font-family: Roboto;
+        font-size: 15px;
+        font-weight: 300;
+        margin-left: 12px;
+        padding: 0 11px 0 13px;
+        text-overflow: ellipsis;
+        width: 200px;
+      }
+
+      #pac-input:focus {
+        border-color: #4d90fe;
+      }
+
+      .pac-container {
+        font-family: Roboto;
+      }
+
+      #type-selector {
+        color: #fff;
+        background-color: #4d90fe;
+        padding: 5px 11px 0px 11px;
+      }
+
+      #type-selector label {
+        font-family: Roboto;
+        font-size: 13px;
+        font-weight: 300;
+      }
+      #target {
+        width: 345px;
+      }
+    </style>
+  </head>
+  <body>
+
+    <h3>Is it uphill?</h3>
+    <div id ="info">
+      <p id = "extra">Enter start and end point below and find out if there will be a hill!</p>
+    </div>
+    <div id="map">
+    <input id="pac-input" class="controls" type="text" placeholder="Start">
+    <input id="pac-input2" class="controls" type="text" placeholder="End">
+    </div>
+    <script>
+      function initMap() {
+        var directionsService = new google.maps.DirectionsService;
+        var directionsDisplay = new google.maps.DirectionsRenderer;
+        var elevator = new google.maps.ElevationService;
+        var map = new google.maps.Map(document.getElementById('map'), {
+          zoom: 11,
+          center: {lat: 38, lng: -122},
+          mapTypeId: 'roadmap'
+        });
+        directionsDisplay.setMap(map);
+        
+         // Create the search box and link it to the UI element.
+        var input = document.getElementById('pac-input');
+        var searchBox = new google.maps.places.SearchBox(input);
+
+        var endInput = document.getElementById('pac-input2');
+        var endSearchBox = new google.maps.places.SearchBox(endInput);
+
+        var elevator = new google.maps.ElevationService;
+        map.controls[google.maps.ControlPosition.TOP_LEFT].push(input);
+        map.controls[google.maps.ControlPosition.TOP_LEFT].push(endInput);
+
+
+        searchBox.addListener('places_changed', function() {
+          runProgram(
+            searchBox.getPlaces(),
+            endSearchBox.getPlaces(),
+            elevator,
+            directionsService,
+            directionsDisplay); 
+        });
+
+        endSearchBox.addListener('places_changed', function() {
+
+          runProgram(
+            searchBox.getPlaces(),
+            endSearchBox.getPlaces(),
+            elevator,
+            directionsService,
+            directionsDisplay); 
+          
+        });
+      }
+
+      function runProgram(
+        startPlaces,
+        endPlaces,
+        elevator,
+        directionsService,
+        directionsDisplay) {
+
+        if (endPlaces.length === 0 || startPlaces.length === 0) {
+            return;
+        }
+
+        var endPlace = endPlaces[0];
+        var place = startPlaces[0]; 
+
+        getElevationDiff(
+        place.geometry.location,
+        endPlace.geometry.location,
+        elevator, 
+        function(elevDiff) {
+          if (elevDiff >=0) {
+            document.getElementById('extra').innerHTML = ("The elevation is " + elevDiff + ". - There IS A HILL!");
+          } else {
+            document.getElementById('extra').innerHTML = ("the difference is " + elevDiff + "we might just be hill free folks!!");
+          }
+        });
+
+        if (startPlaces.length !== 0 
+             && endPlaces.length !== 0) {
+             calculateAndDisplayRoute(directionsService,
+             directionsDisplay,
+             place.geometry.location,
+             endPlace.geometry.location);
+        }
+      }
+      
+      function calculateAndDisplayRoute(
+        directionsService,
+        directionsDisplay,
+        start,
+        end) {
+        directionsService.route({
+          origin: start,
+          destination: end,
+          travelMode: 'WALKING'
+        }, function(response, status) {
+          if (status === 'OK') {
+            directionsDisplay.setDirections(response);
+          } else {
+            window.alert('Directions request failed due to ' + status);
+          }
+        });
+      }
+
+      function getElevationDiff(location, endLocation, elevator, cb) {
+        var startElev = null;
+        var endElev = null;
+
+         getElevation(
+              location,
+              elevator, 
+              function(result1) { 
+                startElev = result1;
+                if (endElev != null) {
+                  cb(endElev - startElev);
+                  //If it's positivethe end is higher than start and therefore there IS a hill!!
+                }
+          });
+
+         getElevation(
+              endLocation,
+              elevator, 
+              function(result2) { 
+                endElev = result2;
+                if (startElev != null) {
+                  cb(endElev - startElev);
+                }
+            });
+      }
+
+      function getElevation(location, elevator, callback) {
+        elevator.getElevationForLocations({
+          'locations': [location]
+        }, function(results, status) {
+          if (status === 'OK') {
+            if (results[0]) {
+                callback(results[0].elevation);
+            } else {
+                return null;
+            }
+          } else {
+              return null;
+          }
+        });
+      }
+    
+    </script>
+    <script src="https://maps.googleapis.com/maps/api/js?key={{my_key}}&libraries=places&callback=initMap" async defer></script>
+
+  </body>
+</html>
